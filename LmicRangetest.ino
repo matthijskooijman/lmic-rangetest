@@ -28,7 +28,7 @@ static u1_t NWKSKEY[16] = {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 static u1_t APPSKEY[16] = {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
 
 // LoRaWAN end-device address (DevAddr)
-static u4_t DEVADDR = 0x00000000;
+static u4_t DEVADDR = 0x276B9A00;
 
 // These callbacks are only used in over-the-air activation, so they are
 // left empty here (we cannot leave them out completely unless
@@ -48,6 +48,7 @@ int const LORA_PORT = 10;
 
 gps_fix gps_log[8];
 uint8_t gps_log_next = 0;
+uint8_t dr_log[8];
 
 #define lengthof(x) (sizeof(x) / sizeof(*(x)))
 
@@ -157,7 +158,9 @@ void setup() {
   LMIC_reset();
 
   // Set up personalized activation
-  LMIC_setSession (0x1, DEVADDR, NWKSKEY, APPSKEY);
+  uint32_t addr = DEVADDR;
+  addr |= eeprom_read_byte((uint8_t*)(13+7));
+  LMIC_setSession (0x1, addr, NWKSKEY, APPSKEY);
 
   // Set up the channels used by the Things Network, which corresponds
   // to the defaults of most gateways. Without this, only three base
@@ -184,11 +187,6 @@ void setup() {
   // Disable link check validation
   LMIC_setLinkCheckMode(0);
 
-  // Use a fixed data rate of SF9 (not sure if tx power is actually
-  // used). SF9 is the lowest datarate that (withing the TTN fair-usage-policy of 30 seconds of airtime
-  // per day) allows us to send at least 4 packets every hour.
-  LMIC_setDrTxpow(DR_SF9, 14);
-
   // Let LMIC compensate for +/- 1% clock error
   LMIC_setClockError(MAX_CLOCK_ERROR * 1 / 100);
 
@@ -197,6 +195,8 @@ void setup() {
   digitalWrite(SW_GND_PIN, HIGH);
 
   pinMode(LED_BUILTIN, OUTPUT);
+
+  randomSeed(analogRead(0));
 
   Serial.begin(9600);
   Serial.println(F("Start"));
@@ -218,7 +218,7 @@ void showState() {
       led = (millis() / 64) % 2;
       break;
     case State::WAITING_FOR_AIRTIME:
-      led = false
+      led = 0;
       break;
   }
   digitalWrite(LED_BUILTIN, led);
@@ -238,15 +238,18 @@ void loop() {
       setState(State::WAITING_FOR_AIRTIME);
 
     if (have_fix && (LMIC.opmode & OP_TXRXPEND) == 0) {
+      dr_log[gps_log_next] = random(DR_SF12, DR_SF7B);
+      LMIC_setDrTxpow(dr_log[gps_log_next], 14);
+
       // Try sending the data. If TX is now pending, we'll be sending.
       // If not, we're waiting for duty cycle limits, so cancel
       // transmission to prevent sending an outdated GPS position later.
       queueData();
 
       if ((LMIC.opmode & OP_TXRXPEND) != 0) {
+        dumpData();
         // Packet is being sent now, advance gps log
         gps_log_next = (gps_log_next + 1) % lengthof(gps_log);
-        dumpData();
         setState(State::TRANSMITTING);
       } else {
         // No airtime available yet, clear packet again
@@ -265,6 +268,8 @@ void dumpData() {
       Serial.print(gps_log[i].latitudeL()/10000000.0, 6);
       Serial.print(F(", "));
       Serial.print(gps_log[i].longitudeL()/10000000.0, 6);
+      Serial.print(F(", "));
+      Serial.print(dr_log[i]);
       if (i == gps_log_next) {
         Serial.println(F(" [most recent value]"));
       } else {
@@ -287,7 +292,9 @@ void queueData() {
 
   for (uint8_t i = 0; i < lengthof(gps_log); ++i) {
     gps_fix *cur = &gps_log[(gps_log_next + i) % lengthof(gps_log)];
+    uint8_t curdr = dr_log[(gps_log_next + i) % lengthof(gps_log)];
     if (cur->valid.location) {
+      *ptr++ = curdr;
       gpsPack(ptr, cur->latitudeL());
       ptr += 3;
       gpsPack(ptr, cur->longitudeL());
