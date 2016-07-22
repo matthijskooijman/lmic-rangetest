@@ -40,6 +40,7 @@ FIELDS = [
     "latitude", "longitude", "seen", "received",
     "lsnr", "rssi", "datarate",
     "gateway", "gateway_latitude", "gateway_longitude",
+    "server_time", "dev_eui", "dev_num",
 ]
 HOME_DIR = os.path.dirname(os.path.realpath(__file__))
 HTML_DIR = os.path.join(HOME_DIR, 'html')
@@ -84,11 +85,9 @@ def process_data(message, payload):
         lon = unpack_coord(payload[offset + 4:offset + 7])
         coords.append((dr, lat, lon))
 
-    metadata = message.get('metadata')
-
     if coords[0] not in seen:
         seen.append(coords[0])
-        emit_coord(coords[0], metadata, True)
+        emit_coord(coords[0], message, True)
 
     if coords[0] in missed:
         missed.remove(coords[0])
@@ -96,7 +95,7 @@ def process_data(message, payload):
     for coord in coords[1:]:
         if coord not in seen and coord not in missed:
             missed.append(missed)
-            emit_coord(coord, metadata, False)
+            emit_coord(coord, message, False)
 
 def int_to_dr(num):
 	if num == 0:
@@ -116,7 +115,10 @@ def int_to_dr(num):
 	else:
 		return '???'
 
-def emit_coord(coord, metadata, seen):
+def emit_coord(coord, message, seen):
+    metadata = message.get('metadata')
+    dev_eui = message.get('dev_eui')
+    dev_num = int(dev_eui, 16) & 0xff
     for m in metadata:
         if seen:
             emit_line(
@@ -125,6 +127,7 @@ def emit_coord(coord, metadata, seen):
                 lsnr=m.get('lsnr'), datarate=m.get('datarate'), rssi=m.get('rssi'),
                 gateway=m.get('gateway_eui'),
                 gateway_latitude=m.get('latitude'), gateway_longitude=m.get('longitude'),
+                server_time=m.get('server_time'), dev_eui=dev_eui, dev_num=dev_num,
             )
         else:
             dr = int_to_dr(coord[0])
@@ -134,6 +137,7 @@ def emit_coord(coord, metadata, seen):
                 lsnr=0, datarate=dr, rssi=0,
                 gateway=m.get('gateway_eui'),
                 gateway_latitude=m.get('latitude'), gateway_longitude=m.get('longitude'),
+                server_time=m.get('server_time'), dev_eui=dev_eui, dev_num=dev_num,
             )
 
 
