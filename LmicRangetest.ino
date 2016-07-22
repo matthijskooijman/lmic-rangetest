@@ -71,6 +71,8 @@ State state = State::WAITING_FOR_GPS;
 void setState(State newState);
 void setState(State newState) {
   state = newState;
+  Serial.print(millis());
+  Serial.print(F(": "));
   switch (newState) {
     case State::WAITING_FOR_GPS:
       Serial.println(F("WAITING_FOR_GPS"));
@@ -79,7 +81,9 @@ void setState(State newState) {
       Serial.println(F("WAITING_FOR_FIX"));
       break;
     case State::TRANSMITTING:
-      Serial.println(F("TRANSMITTING"));
+      Serial.print(F("TRANSMITTING ("));
+      dumpDatarate(LMIC.datarate);
+      Serial.println(F(")"));
       break;
     case State::WAITING_FOR_AIRTIME:
       Serial.println(F("WAITING_FOR_AIRTIME"));
@@ -88,8 +92,8 @@ void setState(State newState) {
 }
 
 void onEvent (ev_t ev) {
-  Serial.print(os_getTime());
-  Serial.print(": ");
+  Serial.print(millis());
+  Serial.print(F(": "));
   switch (ev) {
     case EV_SCAN_TIMEOUT:
       Serial.println(F("EV_SCAN_TIMEOUT"));
@@ -269,13 +273,26 @@ void dumpData() {
       Serial.print(F(", "));
       Serial.print(gps_log[i].longitudeL()/10000000.0, 6);
       Serial.print(F(", "));
-      Serial.print(dr_log[i]);
+      dumpDatarate(dr_log[i]);
       if (i == gps_log_next) {
         Serial.println(F(" [most recent value]"));
       } else {
         Serial.println();
       }
     }
+  }
+}
+
+void dumpDatarate(uint8_t datarate) {
+  if (datarate == DR_SF7B) {
+    Serial.print(F("SF7B"));
+  } else if (datarate == DR_FSK) {
+    Serial.print(F("FSK"));
+  } else if (datarate <= DR_SF7) {
+    Serial.print(F("SF"));
+    Serial.print(12 - (datarate));
+  } else {
+    Serial.print(F("Invalid datarate"));
   }
 }
 
