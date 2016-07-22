@@ -242,7 +242,7 @@ void loop() {
       setState(State::WAITING_FOR_AIRTIME);
 
     if (have_fix && (LMIC.opmode & OP_TXRXPEND) == 0) {
-      dr_log[gps_log_next] = random(DR_SF12, DR_SF7B);
+      digitalWrite(LED_BUILTIN, true);
       LMIC_setDrTxpow(dr_log[gps_log_next], 14);
 
       // Try sending the data. If TX is now pending, we'll be sending.
@@ -259,6 +259,7 @@ void loop() {
         // No airtime available yet, clear packet again
         LMIC_clrTxData();
       }
+      digitalWrite(LED_BUILTIN, false);
     }
   }
 }
