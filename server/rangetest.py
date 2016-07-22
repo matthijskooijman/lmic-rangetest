@@ -72,16 +72,17 @@ def process_data(message, payload):
         logging.info('Ignoring message on port {}'.format(message['port']))
         return
 
-    if len(payload) % 6 != 0:
+    if len(payload) % 7 != 0:
         logging.warning('Invalid rangetest packet received with length {}'.format(len(payload)))
         return
 
     coords = []
 
-    for offset in range(0, len(payload), 6):
-        lat = unpack_coord(payload[offset:offset + 3])
-        lon = unpack_coord(payload[offset + 3:offset + 6])
-        coords.append((lat, lon))
+    for offset in range(0, len(payload), 7):
+        dr = payload[offset]
+        lat = unpack_coord(payload[offset + 1:offset + 4])
+        lon = unpack_coord(payload[offset + 4:offset + 7])
+        coords.append((dr, lat, lon))
 
     metadata = message.get('metadata')
 
@@ -97,16 +98,44 @@ def process_data(message, payload):
             missed.append(missed)
             emit_coord(coord, metadata, False)
 
+def int_to_dr(num):
+	if num == 0:
+		return 'SF12BW125'
+	elif num == 1:
+		return 'SF11BW125'
+	elif num == 2:
+		return 'SF10BW125'
+	elif num == 3:
+		return 'SF9BW125'
+	elif num == 4:
+		return 'SF8BW125'
+	elif num == 5:
+		return 'SF7BW125'
+	elif num == 6:
+		return 'SF7BW250'
+	else:
+		return '???'
 
 def emit_coord(coord, metadata, seen):
     for m in metadata:
-        emit_line(
-            latitude=coord[0], longitude=coord[1],
-            seen=seen, received=m.get('gateway_timestamp'),
-            lsnr=m.get('lsnr'), datarate=m.get('datarate'), rssi=m.get('rssi'),
-            gateway=m.get('gateway_eui'),
-            gateway_latitude=m.get('latitude'), gateway_longitude=m.get('longitude'),
-        )
+        if seen:
+            emit_line(
+                latitude=coord[1], longitude=coord[2],
+                seen=seen, received=m.get('gateway_timestamp'),
+                lsnr=m.get('lsnr'), datarate=m.get('datarate'), rssi=m.get('rssi'),
+                gateway=m.get('gateway_eui'),
+                gateway_latitude=m.get('latitude'), gateway_longitude=m.get('longitude'),
+            )
+        else:
+            dr = int_to_dr(coord[0])
+            emit_line(
+                latitude=coord[1], longitude=coord[2],
+                seen=seen, received=m.get('gateway_timestamp'),
+                lsnr=0, datarate=dr, rssi=0,
+                gateway=m.get('gateway_eui'),
+                gateway_latitude=m.get('latitude'), gateway_longitude=m.get('longitude'),
+            )
+
 
 
 def emit_line(**kwargs):
