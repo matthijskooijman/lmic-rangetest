@@ -85,13 +85,27 @@
             </tr>
             </table>`);
         } else {
+            var layer = getLayer(gatewayLayers, "Not received");
             L.circle([data["latitude"], data["longitude"]], 10, {
                 color: "black",
                 dashArray: [5, 5],
                 fillColor: "black",
                 fillOpacity: 0.5
-            }).addTo(map);
-
+            }).addTo(layer).bindPopup(`
+            <table>
+            <tr>
+                <th>Node</th><td>${data["dev_num"]} (${data["dev_eui"]})</td>
+            </tr>
+            <tr>
+                <th>LL</th><td>${data["latitude"]},${data["longitude"]}</td>
+            </tr>
+            <tr>
+                <th>Datarate</th><td>${data["datarate"]}</td>
+            </tr>
+            <tr>
+                <th>Received</th><td>${data["server_time"]}</td>
+            </tr>
+            </table>`);
         }
 
     }
