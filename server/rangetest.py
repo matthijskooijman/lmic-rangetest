@@ -60,6 +60,7 @@ def on_message(client, userdata, msg):
     try:
         message = json.loads(msg.payload.decode('utf8'))
         payload = base64.b64decode(message.get('payload', ''))
+        logging.debug("Message from {} ({})".format(int(message.get('dev_eui'), 16) & 0xff, message.get('dev_eui')))
         process_data(message, payload)
 
     # python2 uses ValueError and perhaps others, python3 uses JSONDecodeError
